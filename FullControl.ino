@@ -3,7 +3,6 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9340.h>
 #include <Bounce.h>
-#include <SdFat.h>
 
   // Designations for TFT screen pins
 #define _SCLK 13    // Serial Clock
@@ -12,7 +11,6 @@
 #define _LCDCS 10   // LCD Chip Select
 #define _RST 9      // Reset
 #define _DC 8       // Data/Command
-#define _SDCS 3     // SD Chip Select
 
   // Designations for multiplexer row functions.
 #define BUTTON_ROW 1
@@ -28,7 +26,6 @@
 #define GO_PIN 5
 #define PRIME_PIN 6
 #define PUSH_PIN 7
-#define DAQ_PIN 8
 
   // Designations for motor and valve control pins.
 #define MOTOR_PIN 5
@@ -58,7 +55,6 @@ int SLOW_SPEED;
 int DOOR_CASE;
 int SPEED;
 int N2_CASE;
-int DAQ_CASE;
 
   // These are the door's maximum speeds at various stages of opening and closing, out of 255
 #define UP_GO_SPEED 150;     // Target speed during opening. Raising above 150 may cause damage to the fixture if the door cannot decelerate quickly enough.
@@ -67,20 +63,12 @@ int DAQ_CASE;
 #define DOWN_SLOW_SPEED 35;  // Slowdown speed during closing.
 
   // Coordinate arrays for displaying temperatures on the TFT. Change these to change text locations.
-int u[16] = {10, 90, 170, 10, 90, 170, 10, 90, 170, 50, 130, 50, 130, 78, 78, 78};
-int v[16] = {48, 48, 48, 72, 72, 72, 96, 96, 96, 176, 176, 200, 200, 256, 280, 304};
-int labelX[5] = {6, 30, 4, 4, 4};
-int labelY[5] = {24, 152, 256, 280, 304};
-
-  // Variables for DAQ that must be defined globally
-int FILE_COUNT;        // Counts number of files on the SD card
-char *FILE_NAME;       // Name of new DAQ file
-float DAQ_START_TIME;  // DAQ timer
+int u[15] = {10, 90, 170, 10, 90, 170, 10, 90, 170, 50, 130, 50, 130, 78, 78};
+int v[15] = {48, 48, 48, 72, 72, 72, 96, 96, 96, 176, 176, 200, 200, 256, 280};
+int labelX[4] = {6, 30, 4, 4};
+int labelY[4] = {24, 152, 256, 280};
 
   // Initializes instances of various class objects.
-File daqFile;
-SdFat SD;
-SdFile file;
 MuxShield muxShield;
 Adafruit_ILI9340 tft = Adafruit_ILI9340(_LCDCS, _DC, _RST);
 
@@ -93,7 +81,6 @@ Bounce bounceOK = Bounce();
 Bounce bounceGO = Bounce();
 Bounce bouncePRIME = Bounce();
 Bounce bouncePUSH = Bounce();
-Bounce bounceDAQ = Bounce();
 
 //--------------------------------------------------------------------------------------------------------//      SETUP      //--------------------------------------------------------------------------------------------------------//
 void setup() {
@@ -113,7 +100,6 @@ void setup() {
   bounceGO.attach(BUTTON_ROW, GO_PIN);
   bouncePRIME.attach(BUTTON_ROW, PRIME_PIN);
   bouncePUSH.attach(BUTTON_ROW, PUSH_PIN);
-  bounceDAQ.attach(BUTTON_ROW, DAQ_PIN);
 
   // Set the debouncing interval for each instance.
   bounceHall0.interval(50);
@@ -124,7 +110,6 @@ void setup() {
   bounceGO.interval(50);
   bouncePRIME.interval(50);
   bouncePUSH.interval(50);
-  bounceDAQ.interval(50);
 
   pinMode(MOTOR_PIN,OUTPUT);
   pinMode(DIRECTION_PIN,OUTPUT);
@@ -132,7 +117,6 @@ void setup() {
   analogWrite(DIRECTION_PIN,0);
   
   tftStartup();
-  sdStartup();
   tftLabelLayout();
   
 }
@@ -150,7 +134,6 @@ void loop() {
   bounceGO.update();
   bouncePRIME.update();
   bouncePUSH.update();
-  bounceDAQ.update();
     
   // Execute door control logic
   if ( !bounceOK.read() ) {       // If the DOOR ENABLE switch is enabled
@@ -159,40 +142,9 @@ void loop() {
     DOOR_CASE = 5;                // Set the door's case value to 5 (full stop.)
   }
   doorMotion();                   // Execute motor commands based on the door case.
-
-  if ( bounceDAQ.fell() ) {       // If the DAQ toggle has been depressed since the last loop
-    daqStartup();                 // Begin DAQ, create new file with new filename, write header
-    DAQ_CASE = 2;                 // DAQ is now logging
-  }
-  if ( bounceDAQ.rose() ) {       // If the DAQ toggle has been released since the last loop,
-    DAQ_CASE = 1;                 // DAQ is inactive
-  }  
-
-
-  String dataString = "";
-  if (DAQ_CASE == 2) {            // If DAQ is logging, initialize data string and record starting time
-    float runTime = millis() - DAQ_START_TIME;
-    float time = runTime/1000;
-    dataString += String(time);
-  }
   
   // Read all thermistors and update the temperature reading array
   tempRead();
-  
-  uint8_t i;
-  if (DAQ_CASE == 2) {            // If DAQ is active, append recorded temperatures to the log string.
-    for (i=0; i<9; i++) {
-      dataString += '\t';
-      dataString += T[0][i];
-    }
-    for (i=0; i<9; i++) {
-      dataString += '\t';
-      dataString += T[1][i];
-    }
-    daqFile = SD.open(FILE_NAME, FILE_WRITE);       // Open the DAQ file
-    daqFile.println(dataString);                    // Print the log string to the DAQ file
-    daqFile.close();                                // Close the DAQ file
-  }
   
   // Execute N2 control logic
   N2Control();
@@ -201,7 +153,6 @@ void loop() {
   tempPrint();
   doorPrint();
   N2Print();
-  daqPrint();
 
 }
 
@@ -220,33 +171,6 @@ void tftStartup()
   delay(500);
 }
 
-//-------------------------------------------------// SD CARD STARTUP
-void sdStartup()
-{
-  tft.fillScreen(BLUE);
-  tft.setCursor(0,64);
-  tft.setTextColor(WHITE);
-  tft.setTextSize(2);
-  tft.print("Initializing SD.");
-  if (!SD.begin(_SDCS)) {
-    tft.setTextColor(RED);
-    tft.println();
-    tft.println("Card failed, or not present.");
-    tft.println("Eject, re-insert, and reset.");
-    while(true);
-  }
-  delay(750);
-  tft.print(".");
-  delay(750);
-  tft.println(".");
-  delay(1000);
-  tft.setTextColor(GREEN);
-  tft.println();
-  tft.println("SD card initialized.");
-  delay(2000);
-  
-}
-
 //-------------------------------------------------// TFT LABEL LAYOUT
 void tftLabelLayout()
 {
@@ -262,8 +186,6 @@ void tftLabelLayout()
   tft.print("DOOR:");
   tft.setCursor(labelX[3],labelY[3]);
   tft.print("  N2:");
-  tft.setCursor(labelX[4],labelY[4]);
-  tft.print(" DAQ:");
 }
 
 //--------------------------------------------------------------------------------------------------------// LOOP FUNCTIONS //-------------------------------------------------------------------------------------------------------//
@@ -370,32 +292,6 @@ void motorDecelerate()
     analogWrite(MOTOR_PIN,pwm);
     delay(delayTime);
   }
-}
-
-//-------------------------------------------------// DAQ STARTUP
-void daqStartup()
-{
-  FILE_COUNT = fileCounter();
-  String nameString = "DAQ"; nameString += FILE_COUNT; nameString += ".txt";
-  int nameLength = nameString.length() + 1;
-  char nameChar[nameLength];
-  nameString.toCharArray(nameChar, 12);
-  FILE_NAME = nameChar;
-  daqFile = SD.open(FILE_NAME, FILE_WRITE);
-  DAQ_START_TIME = millis();
-  daqFile.println("Time(s)\t S1\t S2\t S3\t S4\t S5\t S6\t S7\t S8\t S9\t A1\t A2\t A3\t A4\t A5\t A6\t A7\t A8\t A9");
-  daqFile.close();
-}
-
-//-------------------------------------------------// FILE COUNTER
-int fileCounter()
-{
-  int k = 0;
-  while(file.openNext(SD.vwd(),O_READ)) {
-    k++;
-    file.close();
-  }
-  return k;
 }
 
 //-------------------------------------------------// TEMPERATURE READ
@@ -558,23 +454,6 @@ void N2Print()
     case 4:
       tft.setTextColor(RED,BLUE);
       tft.print("--PUSH OPEN--");
-  }
-  tft.setTextColor(WHITE);
-}
-
-//-------------------------------------------------// PRINT DAQ STATUS
-void daqPrint()
-{
-  tft.setCursor(u[15],v[15]);
-  switch(DAQ_CASE) {
-    case 1:
-      tft.setTextColor(WHITE, BLUE);
-      tft.print("READY  ");
-      break;
-    case 2:
-      tft.setTextColor(GREEN, BLUE);
-      tft.print("LOGGING");
-      break;
   }
   tft.setTextColor(WHITE);
 }

@@ -12,7 +12,6 @@
 #define GO_PIN 5
 #define PRIME_PIN 6
 #define PUSH_PIN 7
-#define DAQ_PIN 8
 #define MOTOR_PIN 5
 #define DIR_PIN A3
 #define VALVE_PIN A4
@@ -32,7 +31,6 @@ Bounce bounceOK = Bounce();
 Bounce bounceGO = Bounce();
 Bounce bouncePRIME = Bounce();
 Bounce bouncePUSH = Bounce();
-Bounce bounceDAQ = Bounce();
 
 void setup() {
   muxShield.setMode(BUTTON_ROW, DIGITAL_IN_PULLUP);
@@ -47,7 +45,6 @@ void setup() {
   bounceGO.attach(BUTTON_ROW, GO_PIN);
   bouncePRIME.attach(BUTTON_ROW, PRIME_PIN);
   bouncePUSH.attach(BUTTON_ROW, PUSH_PIN);
-  bounceDAQ.attach(BUTTON_ROW, DAQ_PIN);
 
   bounceHall0.interval(50);
   bounceHall1.interval(50);
@@ -57,7 +54,6 @@ void setup() {
   bounceGO.interval(50);
   bouncePRIME.interval(50);
   bouncePUSH.interval(50);
-  bounceDAQ.interval(50);
 
   Serial.begin(115200);
 
@@ -74,7 +70,6 @@ void loop() {
   bounceGO.update();
   bouncePRIME.update();
   bouncePUSH.update();
-  bounceDAQ.update();
 
   //  Sets up arrays for thermistor readings, clears memory space
   uint8_t i;

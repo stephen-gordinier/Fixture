@@ -8,7 +8,6 @@
 #define _cs 10      // LCD Chip Select
 #define _rst 9      // Reset
 #define _dc 8       // Data/Command
-#define _sdcs 3     // SD Chip Select
 
 // Coordinate arrays for displaying temperatures on the TFT. Change these to change text locations.
 // The below "picture" of the TFT is for quick reference for determining index locations.
@@ -24,13 +23,13 @@
 //  |                     |
 //  |        13           |
 //  |        14           |
-//  |________15___________|
+//  |_____________________|
 //  
 
-int u[16] = {10, 90, 170, 10, 90, 170, 10, 90, 170, 50, 130, 50, 130, 78, 78, 78};
-int v[16] = {48, 48, 48, 72, 72, 72, 96, 96, 96, 176, 176, 200, 200, 256, 280, 304};
-int labelX[5] = {6, 30, 4, 4, 4};
-int labelY[5] = {24, 152, 256, 280, 304};
+int u[15] = {10, 90, 170, 10, 90, 170, 10, 90, 170, 50, 130, 50, 130, 78, 78};
+int v[15 = {48, 48, 48, 72, 72, 72, 96, 96, 96, 176, 176, 200, 200, 256, 280};
+int labelX[4] = {6, 30, 4, 4};
+int labelY[4] = {24, 152, 256, 280};
 
 
 Adafruit_ILI9340 tft = Adafruit_ILI9340(_cs, _dc, _rst);
@@ -40,8 +39,6 @@ uint8_t i = 0;
 
 int DOOR_CASE = 1;
 int N2_CASE = 1;
-int DAQ_CASE = 1;
-
 
 void setup() {
   
@@ -66,15 +63,10 @@ void loop() {
     N2Print();
     c++;
   }
-  if (c==15) {
-    DAQPrint();
-    c++;
-  }
   
   if (i == 1) {
     N2_CASE = 1;
     DOOR_CASE = 1;
-    DAQ_CASE = 1;
   }
   if (i == 16) {
     N2_CASE = 2;
@@ -83,7 +75,6 @@ void loop() {
   if (i == 32) {
     N2_CASE = 3;
     DOOR_CASE = 3;
-    DAQ_CASE = 2;
   }
   if (i == 48) {
     N2_CASE = 4;
@@ -174,22 +165,6 @@ void N2Print()
     case 4:
       tft.setTextColor(RED,BLUE);
       tft.print("--PUSH OPEN--");
-  }
-  tft.setTextColor(WHITE);
-}
-
-void DAQPrint()
-{
-  tft.setCursor(u[15],v[15]);
-  switch(DAQ_CASE) {
-    case 1:
-      tft.setTextColor(WHITE, BLUE);
-      tft.print("READY  ");
-      break;
-    case 2:
-      tft.setTextColor(GREEN, BLUE);
-      tft.print("LOGGING");
-      break;
   }
   tft.setTextColor(WHITE);
 }

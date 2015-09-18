@@ -2,23 +2,18 @@ List of functions
 
 Setup
 	tftStartup
-	sdStartup
 	tftLabelLayout
 
 Loop
 	doorStateCheck
 	doorMotion
-	daqStartup
 	tempRead
 	N2Control
 	tempPrint
 	doorPrint
 	N2Print
-	daqPrint
 	
 tftStartup
-	
-sdStartup
 	
 tftLabelLayout
 	
@@ -31,11 +26,6 @@ doorMotion
 motorAccelerate
 
 motorDecelerate
-	
-daqStartup
-	fileCounter
-	
-fileCounter
 	
 tempRead
 	Steinhart
@@ -55,5 +45,3 @@ airQuadrants
 doorPrint
 
 N2Print
-
-daqPrint
